@@ -103,7 +103,7 @@ def listpaths(user, token, pattern=None, **kwargs):
     Returns
     -------
     paths : list of str or None
-        Path names that matched the given pattern. None is status is False.
+        Path names that matched the given pattern. None if status is False.
     status : bool
         Whether the paths were correctly found.
     message : str
@@ -125,3 +125,60 @@ def listpaths(user, token, pattern=None, **kwargs):
             return None, False, 'Could not compile path pattern'
         paths = [p for p in paths if r.match(p) is not None]
     return paths, True, 'Paths listed'
+
+
+def _pathkey(x):
+    return x['path']
+
+
+def info(user, token, paths=None, pattern=None, **kwargs):
+    """Retrieves metadata information for paths.
+
+    Parameters
+    ----------
+    user : str
+        Name of user to list paths for.
+    token : str
+        Token for a user.
+    paths : str or list of str or None, optional
+        Only return info for specific paths. If non-empty, pattern must be empty.
+    pattern : str or None, optional
+        Glob string to match paths. If None or an empty string, all
+        paths are returned. If non-empty, paths must be empty.
+    kwargs : other key words
+        Passed into ``fixie.flock()`` when loading user paths file.
+
+    Returns
+    -------
+    infos : list of dicts or None
+        Path infomation dicts. None if status is False.
+    status : bool
+        Whether the paths were correctly found.
+    message : str
+        Status message, if needed.
+    """
+    if paths and pattern:
+        return None, False, 'Only one of paths and patterns may be non-empty'
+    valid, msg, status = verify_user(user, token)
+    if not status:
+        return None, False, msg
+    # load the user file
+    userpaths = resolve_pending_paths(user, **kwargs)
+    if userpaths is None:
+        return None, False, 'User paths file could not be loaded.'
+    # filter paths and convert to list
+    if paths:
+        if isinstance(paths, str):
+            paths = [paths]
+        infos = [userpaths[path] for path in paths if path in userpaths]
+    elif pattern:
+        try:
+            r = re.compile(fnmatch.translate(pattern))
+        except Exception:
+            return None, False, 'Could not compile path pattern'
+        infos = [v for k, v in userpaths.items() if r.match(k) is not None]
+        infos.sort(key=_pathkey)
+    else:
+        infos = list(userpaths.values())
+        infos.sort(key=_pathkey)
+    return infos, True, 'Info found'

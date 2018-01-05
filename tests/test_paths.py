@@ -5,7 +5,7 @@ import time
 from fixie import json
 from fixie import ENV
 
-from fixie_data.paths import resolve_pending_paths, listpaths
+from fixie_data.paths import resolve_pending_paths, listpaths, info
 
 
 def _init_pending_paths(user):
@@ -103,7 +103,7 @@ def test_resolve_pending_paths_all(xdg):
     assert exp_paths == obs_paths
 
 
-def listpaths(xdg, verify_user):
+def test_listpaths(xdg, verify_user):
     user = 'westley'
     given = _init_user_paths(user)
     # no pattern
@@ -114,3 +114,34 @@ def listpaths(xdg, verify_user):
     exp = ['/as', '/wish']
     paths, status, msg = listpaths(user, '42', '*s*', timeout=10.0)
     assert exp == paths
+
+
+def test_info(xdg, verify_user):
+    user = 'humperdinck'
+    given = _init_user_paths(user)
+    # no pattern, no path
+    exp = []
+    for p, i in sorted(given.items()):
+        i['holding'] = float(i['holding'])
+        exp.append(i)
+    infos, status, msg = info(user, '42', timeout=10.0)
+    assert status
+    assert exp == infos
+    # s-pattern, no paths
+    infos, status, msg = info(user, '42', pattern='*s*', timeout=10.0)
+    assert status
+    assert exp[:2] == infos
+    # no pattern, single path
+    infos, status, msg = info(user, '42', paths='/you', timeout=10.0)
+    assert status
+    assert exp[-1:] == infos
+    # no pattern, paths
+    infos, status, msg = info(user, '42', paths=['/you', 'non-exist', '/wish'],
+                              timeout=10.0)
+    assert status
+    assert exp[-2:][::-1] == infos
+    # pattern and paths
+    infos, status, msg = info(user, '42', pattern='*s*', paths='/you', timeout=10.0)
+    assert not status
+    assert infos is None
+
