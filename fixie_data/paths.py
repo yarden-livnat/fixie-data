@@ -3,6 +3,7 @@ import os
 import re
 import glob
 import fnmatch
+import urllib.parse
 
 from fixie import json
 from fixie import ENV, flock, verify_user
@@ -182,3 +183,72 @@ def info(user, token, paths=None, pattern=None, **kwargs):
         infos = list(userpaths.values())
         infos.sort(key=_pathkey)
     return infos, True, 'Info found'
+
+
+def _fetch_url(filename):
+    # first, get the pathname relative to the simulation dir
+    relname = os.path.relpath(filename, ENV['FIXIE_SIMS_DIR'])
+    url = '/fetch?' + urllib.parse.encode({'file': relname})
+    return url, ''
+
+
+def _fetch_bytes(filename):
+    try:
+        with open(filename, 'rb') as f:
+            b = f.read()
+        msg = ''
+    except Exception as e:
+        b = None
+        msg = str(e) + '\n\nFailed to read file: ' + filename
+    return b, msg
+
+
+def fetch(path, user, token, url=True, **kwargs):
+    """Retrieves a path from the server.
+
+    Parameters
+    ----------
+    path : str
+        Path to retrieve.
+    user : str
+        Name of user to list paths for.
+    token : str
+        Token for a user.
+    url : boolean, optional
+        Whether to return a URL from which the file can be downloaded, or
+        the bytes of the file itself.
+    kwargs : other key words
+        Passed into ``fixie.flock()`` when loading user paths file.
+
+    Returns
+    -------
+    url_or_file : str, bytes, or None
+        URL (relative to the server base) where the file may be downloaded (via GET),
+        or the bytes of the file, or None if the status is False/
+    status : bool
+        Whether the path can be fetched.
+    message : str
+        Status message, if needed.
+    """
+    valid, msg, status = verify_user(user, token)
+    if not status:
+        return None, False, msg
+    # load the user file
+    userpaths = resolve_pending_paths(user, **kwargs)
+    if userpaths is None:
+        return None, False, 'User paths file could not be loaded.'
+    # get the file
+    info = userpaths.get(path, None)
+    if info is None:
+        return None, False, 'Path {0!r} does not exist'.format(path)
+    filename = info.get('file', None)
+    if not filename:
+        return None, False, 'Path {0!r} does not not have a file'.format(path)
+    if not os.path.isfile(filename):
+        msg = 'Path file {0!r} does not exist or is a directory'.format(filename)
+        return None, False, msg
+    fetcher = _fetch_url if url else _fetch_bytes
+    url_or_file, msg = fetcher(filename)
+    if url_or_file is None:
+        return None, False, msg
+    return url_or_file, True, 'File fetched'
