@@ -1,12 +1,52 @@
 """Path tests"""
 import os
 import time
+import subprocess
+from collections.abc import Mapping
+
+import pandas as pd
 
 from fixie import json
 from fixie import ENV
 
 from fixie_data.paths import (resolve_pending_paths, listpaths, info, fetch,
-    delete)
+    delete, table)
+
+
+SIMULATION = {
+ 'simulation': {
+  'archetypes': {
+   'spec': [
+    {'lib': 'agents', 'name': 'Sink'},
+    {'lib': 'agents', 'name': 'NullRegion'},
+    {'lib': 'agents', 'name': 'NullInst'},
+   ],
+  },
+  'control': {
+   'duration': 2,
+   'startmonth': 1,
+   'startyear': 2000,
+  },
+  'facility': {
+   'config': {'Sink': {'capacity': '1.00', 'in_commods': {'val': 'commodity'}}},
+   'name': 'Sink',
+  },
+  'recipe': {
+   'basis': 'mass',
+   'name': 'commod_recipe',
+   'nuclide': {'comp': '1', 'id': 'H1'},
+  },
+  'region': {
+   'config': {'NullRegion': None},
+   'institution': {
+    'config': {'NullInst': None},
+    'initialfacilitylist': {'entry': {'number': '1', 'prototype': 'Sink'}},
+    'name': 'SingleInstitution',
+   },
+   'name': 'SingleRegion',
+  },
+ },
+}
 
 
 def _init_pending_paths(user):
@@ -35,7 +75,7 @@ def _init_user_paths(user):
                 'created': time.time(), 'file': sims + '/0.txt',
                 'jobid': 0},
         '/you': {'user': user, 'holding': 10.0, 'path': '/you',
-                 'created': time.time(), 'file': sims + '/1.txt',
+                 'created': time.time(), 'file': sims + '/1.h5',
                  'jobid': 1},
         '/wish': {'user': user, 'holding': 42.0, 'path': '/wish',
                   'created': 1.0, 'file': sims + '/2.txt',
@@ -187,3 +227,20 @@ def test_delete(xdg, verify_user):
     assert not os.path.exists(fname)
     paths = resolve_pending_paths(user, timeout=10.0)
     assert '/as' not in paths
+
+
+def test_table(xdg, verify_user):
+    user = 'yellin'
+    given = _init_user_paths(user)
+    sim = json.dumps(SIMULATION)
+    out = os.path.join(ENV['FIXIE_SIMS_DIR'], '1.h5')
+    cmd = ['cyclus', '-o', out, '-f', 'json', sim]
+    subprocess.check_call(cmd)
+    # now get the table as a data frame
+    tbl0, status, msg = table('Info', '/you', user, '42')
+    assert status, msg
+    assert isinstance(tbl0, pd.DataFrame)
+    # now get the table as a python object (which also covers the JSON string case).
+    tbl1, status, msg = table('Info', '/you', user, '42', format='json:dict')
+    assert status, msg
+    assert isinstance(tbl1, Mapping)

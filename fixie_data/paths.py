@@ -5,11 +5,19 @@ import glob
 import fnmatch
 import urllib.parse
 
+from lazyasd import lazyobject
+
 from fixie import json
 from fixie import ENV, flock, verify_user
 
 
 _USER_PATH_FILE_TEMPLATE = '{0}/{1}.json'
+
+
+@lazyobject
+def cyclus_lib():
+    from cyclus import lib
+    return lib
 
 
 def _user_path_file(user):
@@ -301,3 +309,87 @@ def delete(path, user, token, **kwargs):
         return False, msg.format(filename, path)
     return True, 'File removed'
 
+
+def _open_db(filename):
+    """Opens a Cyclus databse."""
+    db = None
+    msg = ''
+    _, ext = os.path.splitext(filename)
+    if ext == '.h5':
+        try:
+            db = cyclus_lib.Hdf5Back(filename)
+        except Exception as e:
+            msg = str(e) + '\n\nCould not open database as HDF5 file.'
+    elif ext == '.sqlite':
+        try:
+            db = cyclus_lib.SqliteBack(filename)
+        except Exception as e:
+            msg = str(e) + '\n\nCould not open database as SQLite file.'
+    else:
+        msg = 'extension not recongnized as Cyclus output file.'
+    return db, msg
+
+
+def table(name, path, user, token, conds=None, format='dataframe', orient='columns',
+          **kwargs):
+    """Retrieves a table from a path (which must represent a Cyclus database).
+
+    Parameters
+    ----------
+    name : str
+        Name of table to retrieve.
+    path : str
+        Path to remove.
+    user : str
+        Name of user to remove path for.
+    token : str
+        Token for a user.
+    conds : list of 3-tuples or None, optional
+        Conditions to filter table rows with. See the Cyclus FullBackend for
+        more information.  The default (None) is to provide the complete
+        table.
+    format : str, optional
+        Flag for type of object to return. If "dataframe" (default), a pandas
+        DataFrame will be returned. If "json:dict", a Python dict that
+        is JSON serializable (via ``fixie.json``) will be returned. If "json" or
+        "json:str" a JSON string will be returned.
+    orient : str, optional
+        Flag for orientation that is passed into ``pandas.DataFrame.to_json()``
+        See this method for more documentation.
+    kwargs : other key words
+        Passed into ``fixie.flock()`` when loading user paths file.
+
+    Returns
+    -------
+    table : pandas.DataFrame or dict str or None
+        The contents of the table, structure depends on format and orient
+        kwargs. None if table could not be loaded
+    status : bool
+        Whether the table could be loaded.
+    message : str
+        Status message, if needed.
+    """
+    filename, userpaths, status, msg = _ensure_file(path, user, token, **kwargs)
+    if not status:
+        return None, False, msg
+    db, msg = _open_db(filename)
+    if db is None:
+        return None, False, msg
+    try:
+        with db:
+            tbl = db.query(name, conds=conds)
+    except Exception as e:
+        return None, False, str(e) + '\n\nTable could not be loaded from database'
+    # now that we have the table, format it.
+    if format == 'dataframe':
+        rtn = tbl
+    elif format.startswith('json'):
+        try:
+            rtn = tbl.to_json(orient=orient, default_handler=json.default)
+        except Exception as e:
+            return None, False, str(e) + '\n\nCould not format table'
+        if format == "json:dict":
+            rtn = json.loads(rtn)
+    else:
+        return None, False, 'Table format {0!r} not valid'.format(format)
+    return rtn, True, 'Table read'
