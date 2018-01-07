@@ -203,6 +203,30 @@ def _fetch_bytes(filename):
     return b, msg
 
 
+def _ensure_file(path, user, token, **kwargs):
+    """Ensures that a path actually exist, returns the filename, the
+    user paths, a status flag, and a message.
+    """
+    valid, msg, status = verify_user(user, token)
+    if not valid or not status:
+        return None, None, False, msg
+    # load the user file
+    userpaths = resolve_pending_paths(user, **kwargs)
+    if userpaths is None:
+        return None, None, False, 'User paths file could not be loaded.'
+    # get the file
+    info = userpaths.get(path, None)
+    if info is None:
+        return None, None, False, 'Path {0!r} does not exist'.format(path)
+    filename = info.get('file', None)
+    if not filename:
+        return None, None, False, 'Path {0!r} does not not have a file'.format(path)
+    if not os.path.isfile(filename):
+        msg = 'Path file {0!r} does not exist or is a directory'.format(filename)
+        return None, None, False, msg
+    return filename, userpaths, True, ''
+
+
 def fetch(path, user, token, url=True, **kwargs):
     """Retrieves a path from the server.
 
@@ -230,22 +254,8 @@ def fetch(path, user, token, url=True, **kwargs):
     message : str
         Status message, if needed.
     """
-    valid, msg, status = verify_user(user, token)
+    filename, userpaths, status, msg = _ensure_file(path, user, token, **kwargs)
     if not status:
-        return None, False, msg
-    # load the user file
-    userpaths = resolve_pending_paths(user, **kwargs)
-    if userpaths is None:
-        return None, False, 'User paths file could not be loaded.'
-    # get the file
-    info = userpaths.get(path, None)
-    if info is None:
-        return None, False, 'Path {0!r} does not exist'.format(path)
-    filename = info.get('file', None)
-    if not filename:
-        return None, False, 'Path {0!r} does not not have a file'.format(path)
-    if not os.path.isfile(filename):
-        msg = 'Path file {0!r} does not exist or is a directory'.format(filename)
         return None, False, msg
     fetcher = _fetch_url if url else _fetch_bytes
     url_or_file, msg = fetcher(filename)
@@ -275,22 +285,8 @@ def delete(path, user, token, **kwargs):
     message : str
         Status message, if needed.
     """
-    valid, msg, status = verify_user(user, token)
+    filename, userpaths, status, msg = _ensure_file(path, user, token, **kwargs)
     if not status:
-        return False, msg
-    # load the user file
-    userpaths = resolve_pending_paths(user, **kwargs)
-    if userpaths is None:
-        return False, 'User paths file could not be loaded.'
-    # get the file
-    info = userpaths.get(path, None)
-    if info is None:
-        return False, 'Path {0!r} does not exist'.format(path)
-    filename = info.get('file', None)
-    if not filename:
-        return False, 'Path {0!r} does not not have a file'.format(path)
-    if not os.path.isfile(filename):
-        msg = 'Path file {0!r} does not exist or is a directory'.format(filename)
         return False, msg
     # actually try to remove the file
     try:
