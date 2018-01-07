@@ -5,7 +5,7 @@ import time
 from fixie import json
 from fixie import ENV
 
-from fixie_data.paths import resolve_pending_paths, listpaths, info
+from fixie_data.paths import resolve_pending_paths, listpaths, info, fetch
 
 
 def _init_pending_paths(user):
@@ -28,13 +28,17 @@ def _user_path_file(user):
 
 def _init_user_paths(user):
     upf = _user_path_file(user)
+    sims = ENV['FIXIE_SIMS_DIR']
     paths = {
         '/as': {'user': user, 'holding': 'inf', 'path': '/as',
-                'created': time.time()},
+                'created': time.time(), 'file': sims + '/0.txt',
+                'jobid': 0},
         '/you': {'user': user, 'holding': 10.0, 'path': '/you',
-                 'created': time.time()},
+                 'created': time.time(), 'file': sims + '/1.txt',
+                 'jobid': 1},
         '/wish': {'user': user, 'holding': 42.0, 'path': '/wish',
-                  'created': 1.0},
+                  'created': 1.0, 'file': sims + '/2.txt',
+                  'jobid': 2},
         }
     with open(upf, 'w') as f:
         json.dump(paths, f, indent=1)
@@ -144,4 +148,29 @@ def test_info(xdg, verify_user):
     infos, status, msg = info(user, '42', pattern='*s*', paths='/you', timeout=10.0)
     assert not status
     assert infos is None
+
+
+def test_fetch_bytes(xdg, verify_user):
+    user = 'rugen'
+    given = _init_user_paths(user)
+    fname = os.path.join(ENV['FIXIE_SIMS_DIR'], '0.txt')
+    with open(fname, 'w') as f:
+        f.write('as you wish')
+    # fetch the file
+    obs, status, msg = fetch('/as', user, '42', url=False, timeout=10.0)
+    assert status, msg
+    assert b'as you wish' == obs
+
+
+def test_fetch_url(xdg, verify_user):
+    user = 'vizzini'
+    given = _init_user_paths(user)
+    fname = os.path.join(ENV['FIXIE_SIMS_DIR'], '2.txt')
+    with open(fname, 'w') as f:
+        f.write('as I wish')
+    # fetch the file
+    obs, status, msg = fetch('/wish', user, '42', url=True, timeout=10.0)
+    assert status, msg
+    assert '/fetch?file=2.txt' == obs
+
 

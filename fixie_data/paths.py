@@ -188,7 +188,7 @@ def info(user, token, paths=None, pattern=None, **kwargs):
 def _fetch_url(filename):
     # first, get the pathname relative to the simulation dir
     relname = os.path.relpath(filename, ENV['FIXIE_SIMS_DIR'])
-    url = '/fetch?' + urllib.parse.encode({'file': relname})
+    url = '/fetch?' + urllib.parse.urlencode({'file': relname})
     return url, ''
 
 
