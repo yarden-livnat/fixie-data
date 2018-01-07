@@ -5,7 +5,8 @@ import time
 from fixie import json
 from fixie import ENV
 
-from fixie_data.paths import resolve_pending_paths, listpaths, info, fetch
+from fixie_data.paths import (resolve_pending_paths, listpaths, info, fetch,
+    delete)
 
 
 def _init_pending_paths(user):
@@ -174,3 +175,15 @@ def test_fetch_url(xdg, verify_user):
     assert '/fetch?file=2.txt' == obs
 
 
+def test_delete(xdg, verify_user):
+    user = 'r.o.u.s'
+    given = _init_user_paths(user)
+    fname = os.path.join(ENV['FIXIE_SIMS_DIR'], '0.txt')
+    with open(fname, 'w') as f:
+        f.write('as you wish')
+    # fetch the file
+    status, msg = delete('/as', user, '42', timeout=10.0)
+    assert status, msg
+    assert not os.path.exists(fname)
+    paths = resolve_pending_paths(user, timeout=10.0)
+    assert '/as' not in paths

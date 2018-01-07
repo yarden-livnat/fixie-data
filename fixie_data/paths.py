@@ -211,7 +211,7 @@ def fetch(path, user, token, url=True, **kwargs):
     path : str
         Path to retrieve.
     user : str
-        Name of user to list paths for.
+        Name of user to fetch a file for.
     token : str
         Token for a user.
     url : boolean, optional
@@ -252,3 +252,56 @@ def fetch(path, user, token, url=True, **kwargs):
     if url_or_file is None:
         return None, False, msg
     return url_or_file, True, 'File fetched'
+
+
+def delete(path, user, token, **kwargs):
+    """Removes a path (and its file) from the server.
+
+    Parameters
+    ----------
+    path : str
+        Path to remove.
+    user : str
+        Name of user to remove path for.
+    token : str
+        Token for a user.
+    kwargs : other key words
+        Passed into ``fixie.flock()`` when loading user paths file.
+
+    Returns
+    -------
+    status : bool
+        Whether the path can be fetched.
+    message : str
+        Status message, if needed.
+    """
+    valid, msg, status = verify_user(user, token)
+    if not status:
+        return False, msg
+    # load the user file
+    userpaths = resolve_pending_paths(user, **kwargs)
+    if userpaths is None:
+        return False, 'User paths file could not be loaded.'
+    # get the file
+    info = userpaths.get(path, None)
+    if info is None:
+        return False, 'Path {0!r} does not exist'.format(path)
+    filename = info.get('file', None)
+    if not filename:
+        return False, 'Path {0!r} does not not have a file'.format(path)
+    if not os.path.isfile(filename):
+        msg = 'Path file {0!r} does not exist or is a directory'.format(filename)
+        return False, msg
+    # actually try to remove the file
+    try:
+        os.remove(filename)
+    except Exception as e:
+        return False, str(e) + '\n\n' + 'Could not remove path ' + path
+    del userpaths[path]
+    status = _dump_user_paths(user, userpaths, **kwargs)
+    if not status:
+        msg = ('Removed file {0!r} but could not remove path entry {1!r}, '
+               'system is in inconsistent state.')
+        return False, msg.format(filename, path)
+    return True, 'File removed'
+
