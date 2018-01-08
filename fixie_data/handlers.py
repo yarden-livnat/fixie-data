@@ -3,7 +3,7 @@ import os
 
 from fixie import ENV, RequestHandler
 
-from fixie_data.paths import listpaths, info, fetch, delete
+from fixie_data.paths import listpaths, info, fetch, delete, table
 
 
 class ListPaths(RequestHandler):
@@ -90,9 +90,35 @@ class Delete(RequestHandler):
         self.write(response)
 
 
+class Table(RequestHandler):
+
+    schema = {'name': {'type': 'string', 'empty': False, 'required': True},
+              'path': {'type': 'string', 'empty': False, 'required': True},
+              'user': {'type': 'string', 'empty': False, 'required': True},
+              'token': {'type': 'string', 'regex': '[0-9a-fA-F]+', 'required': True},
+              'conds': {'type': 'list',
+                        'schema': {'type': 'list', 'empty': False,
+                                   'minlength': 3, 'maxlength': 3},
+                        'nullable': True},
+              'format': {'type': 'string', 'allowed': ['json', 'json:str', 'json:dict']},
+              'orient': {'type': 'string', 'allowed': ['split', 'records', 'index',
+                                                       'columns', 'values']},
+              }
+    response_keys = ('table', 'status', 'message')
+
+    def post(self, *args, **kwargs):
+        args = self.request.arguments
+        if 'format' not in args:
+            args['format'] = 'json:dict'
+        resp = table(**args)
+        response = dict(zip(self.response_keys, resp))
+        self.write(response)
+
+
 HANDLERS = [
     ('/listpaths', ListPaths),
     ('/info', Info),
     ('/fetch', Fetch),
     ('/delete', Delete),
+    ('/table', Table),
 ]

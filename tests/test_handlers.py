@@ -1,6 +1,7 @@
 """Tests handlers object."""
 import os
 import time
+import subprocess
 
 import pytest
 import tornado.web
@@ -116,3 +117,21 @@ def test_delete_valid(xdg, verify_user, http_client, base_url):
     exp = {'status': True, 'message': 'File removed'}
     assert exp == obs
     assert '0.txt' not in os.listdir(ENV['FIXIE_SIMS_DIR'])
+
+
+@pytest.mark.gen_test
+def test_table_valid(xdg, verify_user, http_client, base_url):
+    user = "inigo"
+    given = _init_user_paths(user)
+    sim = json.dumps(SIMULATION)
+    out = os.path.join(ENV['FIXIE_SIMS_DIR'], '1.h5')
+    cmd = ['cyclus', '-o', out, '-f', 'json', sim]
+    subprocess.check_call(cmd)
+    url = base_url + '/table'
+    # test deletion
+    body = {"name": "Info", "path": "/you", "user": user, "token": "42"}
+    obs = yield fetch(url, body)
+    assert obs['status'], obs['message']
+    assert obs['table']
+
+
