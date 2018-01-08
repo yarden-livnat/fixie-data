@@ -2,6 +2,7 @@
 import os
 import re
 import glob
+import time
 import fnmatch
 import urllib.parse
 
@@ -412,21 +413,37 @@ def gc(**kwargs):
     """
     if 'raise_errors' not in kwargs:
         kwargs['raise_errors'] = False
+    msg = ''
     now = time.time()
     pattern = ENV['FIXIE_PATHS_DIR'] + '/*.json'
     for user_path_file in glob.iglob(pattern):
         if user_path_file.endswith('-pending-path.json'):
             continue
         with flock(user_path_file, **kwargs) as lockfd:
-            # need to keep file locker for whole gc process
+            # need to keep file locked for whole gc process
             if lockfd == 0:
-                return False, user_path_file + ' could not be loaded'
+                msg += user_path_file + ' could not be loaded\n\n'
+                continue
             with open(user_path_file) as f:
                 paths = json.load(f)
-            for info in paths.values():
+            # delete files
+            paths_to_del = set()
+            for path, info in paths.items():
                 age = now - info['created']
                 holding = float(info.get('holding', 'inf'))
-                fname = os.
-                if age >= holding:
-
-
+                fname = info['file']
+                if age >= holding and os.path.isfile(fname):
+                    try:
+                        os.remove(fname)
+                    except Exception as e:
+                        msg += str(e) + '\nCould not delete file ' + fname + '\n\n'
+                        continue
+                    paths_to_del.add(path)
+            # delete paths
+            if len(paths_to_del) == 0:
+                continue
+            for path in paths_to_del:
+                del paths[path]
+            with open(user_path_file, 'w') as f:
+                json.dump(paths, f, indent=1)
+    return not msg, msg
