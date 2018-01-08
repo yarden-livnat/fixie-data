@@ -135,3 +135,14 @@ def test_table_valid(xdg, verify_user, http_client, base_url):
     assert obs['table']
 
 
+@pytest.mark.gen_test
+def test_gc_valid(xdg, verify_user, http_client, base_url):
+    user = "inigo"
+    given = _write_simple_files(user)
+    url = base_url + '/gc'
+    # test deletion
+    body = {}
+    obs = yield fetch(url, body)
+    exp = {'status': True, 'message': ''}
+    assert exp == obs
+    assert '1.h5' not in os.listdir(ENV['FIXIE_SIMS_DIR'])
