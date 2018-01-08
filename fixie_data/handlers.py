@@ -3,7 +3,7 @@ import os
 
 from fixie import ENV, RequestHandler
 
-from fixie_data.paths import listpaths, info, fetch
+from fixie_data.paths import listpaths, info, fetch, delete
 
 
 class ListPaths(RequestHandler):
@@ -76,8 +76,23 @@ class Fetch(RequestHandler):
         self.write(response)
 
 
+class Delete(RequestHandler):
+
+    schema = {'user': {'type': 'string', 'empty': False, 'required': True},
+              'token': {'type': 'string', 'regex': '[0-9a-fA-F]+', 'required': True},
+              'path': {'type': 'string', 'empty': False, 'required': True},
+              }
+    response_keys = ('status', 'message')
+
+    def post(self, *args, **kwargs):
+        resp = delete(**self.request.arguments)
+        response = dict(zip(self.response_keys, resp))
+        self.write(response)
+
+
 HANDLERS = [
     ('/listpaths', ListPaths),
     ('/info', Info),
     ('/fetch', Fetch),
+    ('/delete', Delete),
 ]

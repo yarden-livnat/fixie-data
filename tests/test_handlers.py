@@ -55,6 +55,16 @@ def app():
     return APP
 
 
+def _write_simple_files(user):
+    given = _init_user_paths(user)
+    paths = ['/as', '/you', '/wish']
+    for i, path in enumerate(paths):
+        fname = given[path]['file']
+        with open(fname, 'w') as f:
+            f.write('as you wish ' + str(i))
+    return given
+
+
 @pytest.mark.gen_test
 def test_listpaths_valid(xdg, verify_user, http_client, base_url):
     url = base_url + '/listpaths'
@@ -76,12 +86,7 @@ def test_info_valid(xdg, verify_user, http_client, base_url):
 @pytest.mark.gen_test
 def test_fetch_valid(xdg, verify_user, http_client, base_url):
     user = "inigo"
-    given = given = _init_user_paths(user)
-    paths = ['/as', '/you', '/wish']
-    for i, path in enumerate(paths):
-        fname = given[path]['file']
-        with open(fname, 'w') as f:
-            f.write('as you wish ' + str(i))
+    given = _write_simple_files(user)
     url = base_url + '/fetch'
     # test raw file fetching
     body = {"path": "/as", "user": user, "token": "42", 'url': False}
@@ -99,3 +104,15 @@ def test_fetch_valid(xdg, verify_user, http_client, base_url):
     assert response.code == 200
     assert response.body == b'as you wish 2'
 
+
+@pytest.mark.gen_test
+def test_delete_valid(xdg, verify_user, http_client, base_url):
+    user = "inigo"
+    given = _write_simple_files(user)
+    url = base_url + '/delete'
+    # test deletion
+    body = {"path": "/as", "user": user, "token": "42"}
+    obs = yield fetch(url, body)
+    exp = {'status': True, 'message': 'File removed'}
+    assert exp == obs
+    assert '0.txt' not in os.listdir(ENV['FIXIE_SIMS_DIR'])
