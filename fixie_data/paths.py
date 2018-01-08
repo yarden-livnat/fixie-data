@@ -25,11 +25,11 @@ def _user_path_file(user):
     return _USER_PATH_FILE_TEMPLATE.format(ENV['FIXIE_PATHS_DIR'], user)
 
 
-def _load_user_paths(user, **kwargs):
+def _load_user_paths(user_or_file, is_user=True,  **kwargs):
     """Helper function for loading a user paths file."""
     if 'raise_errors' not in kwargs:
         kwargs['raise_errors'] = False
-    user_path_file = _user_path_file(user)
+    user_path_file = _user_path_file(user_or_file) if is_user else user_or_file
     with flock(user_path_file, **kwargs) as lockfd:
         if lockfd == 0:
             return
@@ -393,3 +393,40 @@ def table(name, path, user, token, conds=None, format='dataframe', orient='colum
     else:
         return None, False, 'Table format {0!r} not valid'.format(format)
     return rtn, True, 'Table read'
+
+
+def gc(**kwargs):
+    """Cleans up paths & files that have past their holding time.
+
+    Parameters
+    ----------
+    kwargs : other key words
+        Passed into ``fixie.flock()`` when loading user paths file.
+
+    Returns
+    -------
+    status : bool
+        Whether garbage collection completed.
+    message : str
+        Status message, if needed.
+    """
+    if 'raise_errors' not in kwargs:
+        kwargs['raise_errors'] = False
+    now = time.time()
+    pattern = ENV['FIXIE_PATHS_DIR'] + '/*.json'
+    for user_path_file in glob.iglob(pattern):
+        if user_path_file.endswith('-pending-path.json'):
+            continue
+        with flock(user_path_file, **kwargs) as lockfd:
+            # need to keep file locker for whole gc process
+            if lockfd == 0:
+                return False, user_path_file + ' could not be loaded'
+            with open(user_path_file) as f:
+                paths = json.load(f)
+            for info in paths.values():
+                age = now - info['created']
+                holding = float(info.get('holding', 'inf'))
+                fname = os.
+                if age >= holding:
+
+
