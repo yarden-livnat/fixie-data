@@ -7,7 +7,7 @@ except ImportError:
     HAVE_SETUPTOOLS = False
 
 
-VERSION = '0.0.1'
+VERSION = '0.0.2'
 
 setup_kwargs = {
     "version": VERSION,
@@ -28,7 +28,7 @@ setup_kwargs = {
     }
 
 if HAVE_SETUPTOOLS:
-    setup_kwargs['install_requires'] = ['fixie']
+    setup_kwargs['install_requires'] = ['fixie', 'fixie-creds']
 
 
 if __name__ == '__main__':

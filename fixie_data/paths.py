@@ -9,7 +9,7 @@ import urllib.parse
 from lazyasd import lazyobject
 
 from fixie import json
-from fixie import ENV, flock, verify_user
+from fixie import ENV, flock
 
 
 _USER_PATH_FILE_TEMPLATE = '{0}/{1}.json'
@@ -95,15 +95,15 @@ def resolve_pending_paths(user, **kwargs):
     return paths
 
 
-def listpaths(user, token, pattern=None, **kwargs):
+# def listpaths(user, token, pattern=None, **kwargs):
+def listpaths(user, pattern=None, **kwargs):
+
     """Lists paths for a user, matching a glob pattern if provided.
 
     Parameters
     ----------
     user : str
         Name of user to list paths for.
-    token : str
-        Token for a user.
     pattern : str or None, optional
         Glob string to match paths. If None or an empty string, all
         paths are returned.
@@ -119,10 +119,7 @@ def listpaths(user, token, pattern=None, **kwargs):
     message : str
         Status message, if needed.
     """
-    valid, msg, status = verify_user(user, token)
-    if not status:
-        return None, False, msg
-    # load the user file
+
     infos = resolve_pending_paths(user, **kwargs)
     if infos is None:
         return None, False, 'User paths file could not be loaded.'
@@ -141,15 +138,13 @@ def _pathkey(x):
     return x['path']
 
 
-def info(user, token, paths=None, pattern=None, **kwargs):
+def info(user, paths=None, pattern=None, **kwargs):
     """Retrieves metadata information for paths.
 
     Parameters
     ----------
     user : str
         Name of user to list paths for.
-    token : str
-        Token for a user.
     paths : str or list of str or None, optional
         Only return info for specific paths. If non-empty, pattern must be empty.
     pattern : str or None, optional
@@ -167,11 +162,9 @@ def info(user, token, paths=None, pattern=None, **kwargs):
     message : str
         Status message, if needed.
     """
-    if paths and pattern:
-        return None, False, 'Only one of paths and patterns may be non-empty'
-    valid, msg, status = verify_user(user, token)
-    if not status:
-        return None, False, msg
+    # if paths and pattern:
+    #     return None, False, 'Only one of paths and patterns may be non-empty'
+
     # load the user file
     userpaths = resolve_pending_paths(user, **kwargs)
     if userpaths is None:
@@ -212,13 +205,13 @@ def _fetch_bytes(filename):
     return b, msg
 
 
-def _ensure_file(path, user, token, **kwargs):
+def _ensure_file(path, user, **kwargs):
     """Ensures that a path actually exist, returns the filename, the
     user paths, a status flag, and a message.
     """
-    valid, msg, status = verify_user(user, token)
-    if not valid or not status:
-        return None, None, False, msg
+    # valid, msg, status = verify_user(user, token)
+    # if not valid or not status:
+    #     return None, None, False, msg
     # load the user file
     userpaths = resolve_pending_paths(user, **kwargs)
     if userpaths is None:
@@ -236,17 +229,16 @@ def _ensure_file(path, user, token, **kwargs):
     return filename, userpaths, True, ''
 
 
-def fetch(path, user, token, url=True, **kwargs):
+def fetch(user, path, url=False, **kwargs):
     """Retrieves a path from the server.
 
     Parameters
     ----------
-    path : str
-        Path to retrieve.
     user : str
         Name of user to fetch a file for.
-    token : str
-        Token for a user.
+    path : str
+        Path to retrieve.
+
     url : boolean, optional
         Whether to return a URL from which the file can be downloaded, or
         the bytes of the file itself.
@@ -263,7 +255,7 @@ def fetch(path, user, token, url=True, **kwargs):
     message : str
         Status message, if needed.
     """
-    filename, userpaths, status, msg = _ensure_file(path, user, token, **kwargs)
+    filename, userpaths, status, msg = _ensure_file(path, user, **kwargs)
     if not status:
         return None, False, msg
     fetcher = _fetch_url if url else _fetch_bytes
@@ -273,7 +265,7 @@ def fetch(path, user, token, url=True, **kwargs):
     return url_or_file, True, 'File fetched'
 
 
-def delete(path, user, token, **kwargs):
+def delete(user, path, **kwargs):
     """Removes a path (and its file) from the server.
 
     Parameters
@@ -282,8 +274,6 @@ def delete(path, user, token, **kwargs):
         Path to remove.
     user : str
         Name of user to remove path for.
-    token : str
-        Token for a user.
     kwargs : other key words
         Passed into ``fixie.flock()`` when loading user paths file.
 
@@ -294,7 +284,7 @@ def delete(path, user, token, **kwargs):
     message : str
         Status message, if needed.
     """
-    filename, userpaths, status, msg = _ensure_file(path, user, token, **kwargs)
+    filename, userpaths, status, msg = _ensure_file(path, user,  **kwargs)
     if not status:
         return False, msg
     # actually try to remove the file
@@ -331,20 +321,18 @@ def _open_db(filename):
     return db, msg
 
 
-def table(name, path, user, token, conds=None, format='dataframe', orient='columns',
+def table(user, name, path, conds=None, format='dataframe', orient='columns',
           **kwargs):
     """Retrieves a table from a path (which must represent a Cyclus database).
 
     Parameters
     ----------
+    user : str
+        Name of user to remove path for.
     name : str
         Name of table to retrieve.
     path : str
         Path to remove.
-    user : str
-        Name of user to remove path for.
-    token : str
-        Token for a user.
     conds : list of 3-tuples or None, optional
         Conditions to filter table rows with. See the Cyclus FullBackend for
         more information.  The default (None) is to provide the complete
@@ -370,7 +358,7 @@ def table(name, path, user, token, conds=None, format='dataframe', orient='colum
     message : str
         Status message, if needed.
     """
-    filename, userpaths, status, msg = _ensure_file(path, user, token, **kwargs)
+    filename, userpaths, status, msg = _ensure_file(path, user, **kwargs)
     if not status:
         return None, False, msg
     db, msg = _open_db(filename)

@@ -2,29 +2,25 @@
 import os
 
 from fixie import ENV, RequestHandler
-
 from fixie_data.paths import listpaths, info, fetch, delete, table, gc
+import fixie_creds
 
 
 class ListPaths(RequestHandler):
 
-    schema = {'user': {'type': 'string', 'empty': False, 'required': True},
-              'token': {'type': 'string', 'regex': '[0-9a-fA-F]+', 'required': True},
-              'pattern': {'type': 'string', 'nullable': True},
-              }
+    schema = {'pattern': {'type': 'string', 'nullable': True}, }
     response_keys = ('paths', 'status', 'message')
 
+    @fixie_creds.authenticated
     def post(self):
-        resp = listpaths(**self.request.arguments)
+        resp = listpaths(self.get_current_user(), **self.request.arguments)
         response = dict(zip(self.response_keys, resp))
         self.write(response)
 
 
 class Info(RequestHandler):
 
-    schema = {'user': {'type': 'string', 'empty': False, 'required': True},
-              'token': {'type': 'string', 'regex': '[0-9a-fA-F]+', 'required': True},
-              'paths': {'anyof': [
+    schema = {'paths': {'anyof': [
                 {'type': 'string'},
                 {'type': 'list', 'empty': False,
                  'schema': {'type': 'string', 'empty': False}},
@@ -33,22 +29,22 @@ class Info(RequestHandler):
               }
     response_keys = ('infos', 'status', 'message')
 
+    @fixie_creds.authenticated
     def post(self):
-        resp = info(**self.request.arguments)
+        resp = info(self.get_current_user(), **self.request.arguments)
         response = dict(zip(self.response_keys, resp))
         self.write(response)
 
 
 class Fetch(RequestHandler):
 
-    schema = {'user': {'type': 'string', 'empty': False, 'required': True},
-              'token': {'type': 'string', 'regex': '[0-9a-fA-F]+', 'required': True},
-              'path': {'type': 'string', 'empty': False, 'required': True},
+    schema = {'path': {'type': 'string', 'empty': False, 'required': True},
               'url': {'type': 'boolean'},
               }
     response_keys = ('file', 'status', 'message')
     chunksize = 16384  # 16 Kb
 
+    @fixie_creds.authenticated
     def get(self, *args, **kwargs):
         """Actually get a file"""
         files = self.request.arguments['file']
@@ -70,22 +66,21 @@ class Fetch(RequestHandler):
                 self.write(b)
         self.finish()
 
+    @fixie_creds.authenticated
     def post(self, *args, **kwargs):
-        resp = fetch(**self.request.arguments)
+        resp = fetch(self.get_current_user(), **self.request.arguments)
         response = dict(zip(self.response_keys, resp))
         self.write(response)
 
 
 class Delete(RequestHandler):
 
-    schema = {'user': {'type': 'string', 'empty': False, 'required': True},
-              'token': {'type': 'string', 'regex': '[0-9a-fA-F]+', 'required': True},
-              'path': {'type': 'string', 'empty': False, 'required': True},
-              }
+    schema = {'path': {'type': 'string', 'empty': False, 'required': True} }
     response_keys = ('status', 'message')
 
+    @fixie_creds.authenticated
     def post(self, *args, **kwargs):
-        resp = delete(**self.request.arguments)
+        resp = delete(self.get_current_user(), **self.request.arguments)
         response = dict(zip(self.response_keys, resp))
         self.write(response)
 
@@ -94,8 +89,6 @@ class Table(RequestHandler):
 
     schema = {'name': {'type': 'string', 'empty': False, 'required': True},
               'path': {'type': 'string', 'empty': False, 'required': True},
-              'user': {'type': 'string', 'empty': False, 'required': True},
-              'token': {'type': 'string', 'regex': '[0-9a-fA-F]+', 'required': True},
               'conds': {'type': 'list',
                         'schema': {'type': 'list', 'empty': False,
                                    'minlength': 3, 'maxlength': 3},
@@ -106,11 +99,12 @@ class Table(RequestHandler):
               }
     response_keys = ('table', 'status', 'message')
 
+    @fixie_creds.authenticated
     def post(self, *args, **kwargs):
         args = self.request.arguments
         if 'format' not in args:
             args['format'] = 'json:dict'
-        resp = table(**args)
+        resp = table(self.get_current_user(), **args)
         response = dict(zip(self.response_keys, resp))
         self.write(response)
 
